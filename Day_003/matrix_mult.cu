@@ -5,8 +5,8 @@ using namespace std;
 
 
 __global__ void matrix_mult_without_tiling(const float *A, const float *B, float *C, int N){
-    int row_idx=blockDim.x*blockIdx.x+threadIdx.x;
-    int col_idx=blockDim.y*blockIdx.y+threadIdx.y;
+    int row_idx=blockDim.y*blockIdx.y+threadIdx.y;
+    int col_idx=blockDim.x*blockIdx.x+threadIdx.x;
 
     if (row_idx<N && col_idx<N){
         float sum=0.0;
@@ -18,8 +18,8 @@ __global__ void matrix_mult_without_tiling(const float *A, const float *B, float
 }
 
 __global__ void matrix_mult_with_tiling(const float *A, const float *B, float *C, int N){
-    int row_idx=blockIdx.x*TILE_WIDTH+threadIdx.x;
-    int col_idx=blockIdx.y*TILE_WIDTH+threadIdx.y;
+    int row_idx=blockDim.y*blockIdx.y+threadIdx.y;
+    int col_idx=blockDim.x*blockIdx.x+threadIdx.x;
 
     if (row_idx<N && col_idx<N){
         float sum=0.0;
