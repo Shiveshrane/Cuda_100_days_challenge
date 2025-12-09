@@ -22,9 +22,6 @@ __global__ void SharedMemTranspose(const float *Input, float *Output, int width,
     int tx=blockIdx.x*blockDim.x+threadIdx.x;
     int ty=blockIdx.y*blockDim.y+threadIdx.y;
 
-    int numTilesX=(width + TILE_SIZE -1)/TILE_SIZE;
-    int numTilesY=(height + TILE_SIZE -1)/TILE_SIZE;
-
     __shared__ float tileA[TILE_SIZE][TILE_SIZE+1]; // +1 to avoid bank conflicts. 
 
     
@@ -98,7 +95,6 @@ int main(){
     cout<<"Time taken by Shared Memory Transpose: "<<msShared<<" ms"<<endl;
     cudaMemcpy(h_Output, d_Output, size, cudaMemcpyDeviceToHost);
 
-    //print both input and output matrix
     cout<<"Input Matrix: "<<endl;
     for (int i=0;i<height;i++){
         for (int j=0;j<width;j++){
