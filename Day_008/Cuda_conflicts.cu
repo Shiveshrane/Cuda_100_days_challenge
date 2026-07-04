@@ -5,26 +5,28 @@
 using namespace std;
 
 
-__global__ void noconflictK(float *output){
+__global__ void noconflictK(float *output, int N){
     __shared__ float tile[TILE_SIZE];
     int tx=blockIdx.x*blockDim.x + threadIdx.x;
-    if (threadIdx.x<TILE_SIZE){
+    if (tx<N){
     tile[threadIdx.x]=tx*0.5f;
     }
     __syncthreads();
-    if (tx<TILE_SIZE && threadIdx.x<TILE_SIZE){
+    if (tx<N){
         output[tx]=tile[threadIdx.x];
     }
 }
 
 
-__global__ void ConflictK(float *output, int stride){
+__global__ void ConflictK(float *output, int stride, int N){
     extern __shared__ float tile[];
     int tx=blockIdx.x*blockDim.x + threadIdx.x;
-    tile[threadIdx.x*stride]=tx*0.5f;
+    if (tx<N){
+        tile[threadIdx.x*stride]=tx*0.5f;
+    }
     __syncthreads();
 
-    if (tx<TILE_SIZE){
+    if (tx<N){
         output[tx]=tile[threadIdx.x*stride];
     }
     
@@ -67,6 +69,7 @@ int main(){
     cout<< "Add row size and colsize"<<endl;
     int rows, cols;
     cin>>rows>>cols;
+    int N=rows*cols;
 
     float *h_mat_input, *h_mat_output;
 
@@ -84,29 +87,31 @@ int main(){
 
 
     float *h_array_output;
-    h_array_output=(float *)malloc(TILE_SIZE*sizeof(float));
+    h_array_output=(float *)malloc(N*sizeof(float));
     float *d_array_output;
-    cudaMalloc((void **)&d_array_output, TILE_SIZE*sizeof(float));
+    cudaMalloc((void **)&d_array_output, N*sizeof(float));
 
-    for (int i=0;i<TILE_SIZE;i++){
+    for (int i=0;i<N;i++){
         h_array_output[i]=float(i);
     }
 
     cudaMemcpy(d_mat_input, h_mat_input, mat_size, cudaMemcpyHostToDevice);
     dim3 blockSize(TILE_SIZE, TILE_SIZE);
     dim3 gridSize((cols + TILE_SIZE -1)/TILE_SIZE, (rows + TILE_SIZE -1)/TILE_SIZE);
+    dim3 gridSize1D((N + TILE_SIZE -1)/TILE_SIZE);
+    dim3 blockSize1D(TILE_SIZE);
 
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
 
     //warmup
-    noconflictK<<<1, TILE_SIZE>>>(d_array_output);
+    noconflictK<<<1, TILE_SIZE>>>(d_array_output, N);
     cudaDeviceSynchronize();
     //No conflict kernel launch
 
     cudaEventRecord(start);
-    noconflictK<<<1, TILE_SIZE>>>(d_array_output);
+    noconflictK<<<gridSize1D, blockSize1D>>>(d_array_output, N);
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     float milliseconds=0;
@@ -117,7 +122,7 @@ int main(){
     int stride=32;
     size_t sharedMemSize=stride*TILE_SIZE*sizeof(float);
     cudaEventRecord(start);
-    ConflictK<<<1, TILE_SIZE, sharedMemSize>>>(d_array_output, stride);
+    ConflictK<<<gridSize1D, blockSize1D, sharedMemSize>>>(d_array_output, stride, N);
     cudaEventRecord(stop);
 
     cudaEventSynchronize(stop);
